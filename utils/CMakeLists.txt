@@ -1,0 +1,2 @@
+add_subdirectory(read_pointcloud)
+add_subdirectory(compute_distance)
