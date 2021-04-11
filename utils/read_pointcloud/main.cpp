@@ -3,11 +3,14 @@
 //
 
 #include <iostream>
-#include "cloud_distance/sample.h"
+#include "cloud_distance/io.h"
 
-  int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
 
-  size_t point_cloud_size = cloud::distance::read_pointcloud(std::string(argv[1]));
-  std::cout << "Point Cloud size: " << point_cloud_size << std::endl;
+  pcl::PointCloud<pcl::PointXYZ> pcl1 = cloud::distance::read_pointcloud(std::string(argv[1]));
+  pcl::PointCloud<pcl::PointXYZ> pcl2 = cloud::distance::read_pointcloud(std::string(argv[2]));
+
+  std::cout << "First Point Cloud size: " << pcl1.size() << std::endl;
+  std::cout << "Second Point Cloud size: " << pcl2.size() << std::endl;
   return 0;
 }

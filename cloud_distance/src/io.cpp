@@ -2,14 +2,14 @@
 // Created by Cem Koc on 4/8/21.
 //
 
-#include "cloud_distance/sample.h"
+#include "cloud_distance/io.h"
 #include <pcl/point_cloud.h>
 #include <pcl/impl/point_types.hpp>
 
 namespace cloud {
 namespace distance {
 
-size_t read_pointcloud(const std::string& fname) {
+pcl::PointCloud<pcl::PointXYZ> read_pointcloud(const std::string& fname) {
   std::cout << fname << std::endl;
   pcl::PointCloud<pcl::PointXYZ> point_cloud;
   pcl::io::loadPLYFile(fname, point_cloud);
@@ -19,8 +19,9 @@ size_t read_pointcloud(const std::string& fname) {
     std::cout << "Point (X Y Z): " << p.x << " " <<  p.y << " " << p.z << std::endl;
 
   }
-  return point_cloud.size();
+  return point_cloud;
 }
+
 
 }
 }

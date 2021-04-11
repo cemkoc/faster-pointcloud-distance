@@ -7,15 +7,12 @@
 #include <cmath>
 
 #include <pcl/io/ply_io.h>
+#include <pcl/impl/point_types.hpp>
 
 namespace cloud {
 namespace distance {
 
-inline void faster_pointcloud_distance_hello() {
-    std::cout << "Hello World." << std::endl;
-}
-
-size_t read_pointcloud(const std::string& fname);
+pcl::PointCloud<pcl::PointXYZ> read_pointcloud(const std::string& fname);
 
 }  // namespace distance
 }  // namespace cloud
