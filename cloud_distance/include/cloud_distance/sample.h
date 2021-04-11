@@ -6,6 +6,8 @@
 #include <iostream>
 #include <cmath>
 
+#include <pcl/io/ply_io.h>
+
 namespace cloud {
 namespace distance {
 

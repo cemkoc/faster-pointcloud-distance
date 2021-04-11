@@ -7,4 +7,5 @@ target_include_directories(faster_cloud_distance PUBLIC
   $<INSTALL_INTERFACE:include>  # <prefix>/include/mylib
 )
 
-#target_link_libraries()
+target_link_libraries(faster_cloud_distance
+        pcl_io)

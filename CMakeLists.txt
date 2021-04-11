@@ -7,7 +7,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 enable_language(C CXX)
 
 project(faster_pcl_distance C CXX)
-find_package(OpenMP REQUIRED)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
+
+find_package(PCL REQUIRED)
+find_package(OpenMP)
 find_package(UPCXX)
 
 add_subdirectory(cloud_distance)
