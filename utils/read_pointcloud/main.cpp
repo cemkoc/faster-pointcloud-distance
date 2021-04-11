@@ -7,10 +7,11 @@
 
 int main(int argc, char* argv[]) {
 
-  pcl::PointCloud<pcl::PointXYZ> pcl1 = cloud::distance::read_pointcloud(std::string(argv[1]));
-  pcl::PointCloud<pcl::PointXYZ> pcl2 = cloud::distance::read_pointcloud(std::string(argv[2]));
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_a = distance::io::read_pointcloud(std::string(argv[1]));
+  pcl::PointCloud<pcl::PointXYZ> pointcloud_b = distance::io::read_pointcloud(std::string(argv[2]));
 
-  std::cout << "First Point Cloud size: " << pcl1.size() << std::endl;
-  std::cout << "Second Point Cloud size: " << pcl2.size() << std::endl;
+  std::cout << "First Point Cloud size: " << pointcloud_a.size() << std::endl;
+  std::cout << "Second Point Cloud size: " << pointcloud_b.size() << std::endl;
+
   return 0;
 }

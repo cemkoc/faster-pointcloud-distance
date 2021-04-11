@@ -8,4 +8,6 @@ target_include_directories(faster_cloud_distance PUBLIC
 )
 
 target_link_libraries(faster_cloud_distance
-        pcl_io)
+        pcl_io
+        pcl_common
+        pcl_kdtree)
