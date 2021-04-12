@@ -1,6 +1,7 @@
 add_library(faster_cloud_distance
-        src/io.cpp
-        include/cloud_distance/io.h)
+        src/distance.cpp
+        include/cloud_distance/io.h
+        include/cloud_distance/distance.h)
 
 target_include_directories(faster_cloud_distance PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
