@@ -42,3 +42,19 @@ Steps:
 3. Output
 
 ### Running Parallel Chamfer Distance
+
+
+
+### Building on Cori NERSC
+
+### Building on Cori NERSC using CUDA
+1. Install CUDA using Spack
+```
+spack install cuda@9.0.176 %gcc@8.3.0
+```
+and now build PCL with CUDA support (assuming you are in project root dir)
+```
+cd pcl
+mkdir build-release-cuda && cd build-release-cuda
+cmake -DCMAKE_BUILD_TYPE=Release -DWITH_CUDA=ON -DCUDA_TOOLKIT_ROOT_DIR=${HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/cuda-9.0.176 -DBUILD_GPU=ON ..
+```
