@@ -19,8 +19,8 @@ else()
   set(PCL_CXX_COMPILE_FEATURES cxx_std_14)
 endif()
 
-list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0")
-list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/boost-1.74.0/lib")
+#list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0")
+#list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/boost-1.74.0/lib")
 
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "possible configurations" FORCE)
 

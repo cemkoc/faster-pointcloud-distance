@@ -1,6 +1,6 @@
 # Find and set Boost flags
 
-list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/")
+#list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/")
 
 # If we would like to compile against a dynamically linked Boost
 if(PCL_BUILD_WITH_BOOST_DYNAMIC_LINKING_WIN32 AND WIN32)
