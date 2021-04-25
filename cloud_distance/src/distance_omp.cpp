@@ -17,15 +17,15 @@ namespace omp {
  */
 double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_a_ptr,
                                   pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr) {
-  double sum_a = 0.0;
-  double sum_b = 0.0;
+  double sum_a = 0.0; // we can try making this an array[NUM_THREADS] and pad it to avoid false sharing
+  double sum_b = 0.0; // same thing as above
   float min_sofar;
 
   pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
   pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
 
   // Forward direction Chamfer
-  #pragma omp parallel for num_threads(NUM_THREADS)
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic)
   for (auto point_iter_a = cloud_a.begin(); point_iter_a < cloud_a.end(); ++point_iter_a) {
     pcl::PointXYZ point_a = *point_iter_a;
     min_sofar = std::numeric_limits<float>::max();
@@ -36,12 +36,15 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
         min_sofar = dist;
       }
     }
-
+    
+    #pragma omp critical
     sum_a = sum_a + static_cast<double>(min_sofar);
   }
 
+
+
   // Backward direction Chamfer
-  #pragma omp parallel for num_threads(NUM_THREADS)
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic)
   for (auto point_iter_b = cloud_b.begin(); point_iter_b < cloud_b.end(); ++point_iter_b) {
     pcl::PointXYZ point_b = *point_iter_b;
     min_sofar = std::numeric_limits<float>::max();
@@ -53,6 +56,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
       }
     }
 
+    #pragma omp critical
     sum_b = sum_b + static_cast<double>(min_sofar);
   }
 
