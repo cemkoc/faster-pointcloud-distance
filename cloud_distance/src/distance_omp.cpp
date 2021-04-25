@@ -25,7 +25,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
 
   // Forward direction Chamfer
-  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic)
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(min_sofar)
   for (auto point_iter_a = cloud_a.begin(); point_iter_a < cloud_a.end(); ++point_iter_a) {
     pcl::PointXYZ point_a = *point_iter_a;
     min_sofar = std::numeric_limits<float>::max();
@@ -36,15 +36,13 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
         min_sofar = dist;
       }
     }
-    
     #pragma omp critical
     sum_a = sum_a + static_cast<double>(min_sofar);
   }
 
 
-
   // Backward direction Chamfer
-  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic)
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(min_sofar)
   for (auto point_iter_b = cloud_b.begin(); point_iter_b < cloud_b.end(); ++point_iter_b) {
     pcl::PointXYZ point_b = *point_iter_b;
     min_sofar = std::numeric_limits<float>::max();
@@ -55,7 +53,6 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
         min_sofar = dist;
       }
     }
-
     #pragma omp critical
     sum_b = sum_b + static_cast<double>(min_sofar);
   }
@@ -104,6 +101,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   std::vector<float> pointKNNSquaredDistance(k); // holds the resultant squared distances to nearby points
 
   // forward direction
+  // pragma omp for num_threads
   for (auto point_iter_a = cloud_a.begin(); point_iter_a != cloud_a.end(); ++point_iter_a) {
     pcl::PointXYZ point_a = *point_iter_a;
 //    std::cout << "K-nearest neighbor search at (" << point_a.x
