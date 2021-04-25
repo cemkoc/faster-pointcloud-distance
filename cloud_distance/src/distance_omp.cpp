@@ -29,6 +29,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   for (auto point_iter_a = cloud_a.begin(); point_iter_a < cloud_a.end(); ++point_iter_a) {
     pcl::PointXYZ point_a = *point_iter_a;
     min_sofar = std::numeric_limits<float>::max();
+    // reduction()
     for (pcl::PointCloud<pcl::PointXYZ>::iterator point_iter_b = cloud_b.begin(); point_iter_b != cloud_b.end(); ++point_iter_b) {
       pcl::PointXYZ point_b = *point_iter_b;
       float dist = l2_norm_sq(point_a, point_b);
