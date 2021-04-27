@@ -1,13 +1,81 @@
 #include "cloud_distance/distance_omp.h"
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/octree/octree_search.h>
 
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <unordered_map>
 
+
+const bool VERBOSE = true;
 
 namespace distance {
 namespace omp {
+
+double Distance::compute_distance_oct(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_a_ptr,
+                                      pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr) {
+  double sum_a = 0.0;
+  double sum_b = 0.0;
+  float minsofar;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
+  pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
+
+  pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree_b(0.01f);
+  octree_b.setInputCloud(cloud_b_ptr);
+  octree_b.addPointsFromInputCloud();
+  pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree_a(0.01f);
+  octree_a.setInputCloud(cloud_a_ptr);
+  octree_a.addPointsFromInputCloud();
+  std::cout <<"done building octrees"<< std::endl;
+
+  std::vector<int> pointIdxRadSearch(100); // holds the resultant indices of the neighboring points
+  std::vector<float> pointRadSquaredDistance(100); // holds the resultant squared distances to nearby points
+  int approxidx;
+  float approxdist;
+  std::unordered_map<int, int> mp;
+
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) 
+  for (auto pt: cloud_a) {
+    int numres = octree_b.radiusSearch(pt, 0.01f, pointIdxRadSearch, pointRadSquaredDistance, 100);
+    if (VERBOSE)
+      mp[numres]++;
+    if (!numres) {
+      octree_b.approxNearestSearch(pt, approxidx, approxdist);
+    }
+    else {
+      approxdist = *min_element(pointRadSquaredDistance.begin(), pointRadSquaredDistance.begin() + numres);
+    }
+    #pragma omp critical
+    sum_a += approxdist;
+  }
+
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) 
+  for (auto pt: cloud_b) {
+    int numres = octree_a.radiusSearch(pt, 0.01f, pointIdxRadSearch, pointRadSquaredDistance, 100);
+    if (VERBOSE)
+      mp[numres]++;
+    if (!numres) {
+      octree_a.approxNearestSearch(pt, approxidx, approxdist);
+    }
+    else {
+      approxdist = *min_element(pointRadSquaredDistance.begin(), pointRadSquaredDistance.begin() + numres);
+    }
+    #pragma omp critical
+    sum_a += approxdist;
+  }
+  
+  if (VERBOSE) {
+    for (auto it:mp) {
+      std::cout << it.first << "\t:\t" << it.second << std::endl;
+    }
+  }
+
+  return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
+}
 
 /**
  * Serial implementation of Bi-directional Chamfer distance between two point clouds.
@@ -23,40 +91,41 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
 
   pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
   pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
+  std::vector<float> to_sum(std::max(cloud_a.size(), cloud_b.size()));
 
   // Forward direction Chamfer
   #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(min_sofar)
-  for (auto point_iter_a = cloud_a.begin(); point_iter_a < cloud_a.end(); ++point_iter_a) {
-    pcl::PointXYZ point_a = *point_iter_a;
+  for (int i = 0; i < cloud_a.size(); ++i) {
+    pcl::PointXYZ point_a = cloud_a.points[i];
     min_sofar = std::numeric_limits<float>::max();
-    // reduction()
-    for (pcl::PointCloud<pcl::PointXYZ>::iterator point_iter_b = cloud_b.begin(); point_iter_b != cloud_b.end(); ++point_iter_b) {
+    for (pcl::PointCloud<pcl::PointXYZ>::iterator point_iter_b = cloud_b.begin(); point_iter_b < cloud_b.end(); ++point_iter_b) {
       pcl::PointXYZ point_b = *point_iter_b;
       float dist = l2_norm_sq(point_a, point_b);
       if (dist < min_sofar) {
         min_sofar = dist;
       }
     }
-    #pragma omp critical
-    sum_a = sum_a + static_cast<double>(min_sofar);
+    to_sum[i] = min_sofar;
   }
+  sum_a = std::accumulate(to_sum.begin(), to_sum.begin() + cloud_a.size(), 0);
 
 
   // Backward direction Chamfer
   #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(min_sofar)
-  for (auto point_iter_b = cloud_b.begin(); point_iter_b < cloud_b.end(); ++point_iter_b) {
-    pcl::PointXYZ point_b = *point_iter_b;
+  for (int i = 0; i < cloud_b.size(); ++i) {
+    pcl::PointXYZ point_b = cloud_b.points[i];
     min_sofar = std::numeric_limits<float>::max();
-    for (pcl::PointCloud<pcl::PointXYZ>::iterator point_iter_a = cloud_a.begin(); point_iter_a != cloud_a.end(); ++point_iter_a) {
+    for (pcl::PointCloud<pcl::PointXYZ>::iterator point_iter_a = cloud_a.begin(); point_iter_a < cloud_a.end(); ++point_iter_a) {
       pcl::PointXYZ point_a = *point_iter_a;
       float dist = l2_norm_sq(point_b, point_a);
       if (dist < min_sofar) {
         min_sofar = dist;
       }
     }
-    #pragma omp critical
-    sum_b = sum_b + static_cast<double>(min_sofar);
+    to_sum[i] = min_sofar;
   }
+
+  sum_b = std::accumulate(to_sum.begin(), to_sum.begin() + cloud_b.size(), 0);
 
   return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
 }
@@ -102,7 +171,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   std::vector<float> pointKNNSquaredDistance(k); // holds the resultant squared distances to nearby points
 
   // forward direction
-  // pragma omp for num_threads
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(minsofar)
   for (auto point_iter_a = cloud_a.begin(); point_iter_a != cloud_a.end(); ++point_iter_a) {
     pcl::PointXYZ point_a = *point_iter_a;
 //    std::cout << "K-nearest neighbor search at (" << point_a.x
@@ -138,6 +207,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   pointKNNSquaredDistance.clear();
 
   // backward direction
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(minsofar)
   for (auto point_iter_b = cloud_b.begin(); point_iter_b != cloud_b.end(); ++point_iter_b) {
     pcl::PointXYZ point_b = *point_iter_b;
 //    std::cout << "K-nearest neighbor search at (" << point_b.x

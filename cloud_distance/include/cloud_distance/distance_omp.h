@@ -8,7 +8,7 @@
 
 #include <omp.h>
 
-#define NUM_THREADS 4
+#define NUM_THREADS 12
 
 namespace distance {
 namespace omp {
@@ -20,6 +20,7 @@ namespace omp {
     class Distance {
       public:
           Distance() {}
+          double compute_distance_oct(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_a_ptr, pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr);
           double compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_a_ptr, pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr);
           double compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_a_ptr, pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr, int k);
     };

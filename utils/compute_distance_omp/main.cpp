@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   auto start = std::chrono::high_resolution_clock::now();
 
   // all-pairs Chamfer distance
-  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr);
+  distance = dist.compute_distance_oct(cloud_a_ptr, cloud_b_ptr);
 
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "[All-pairs] Chamfer distance between: " << distance << std::endl;
