@@ -40,6 +40,12 @@
 
 #pragma once
 
+#include <boost/mpl/inherit_linearly.hpp>
+#include <boost/mpl/joint_view.hpp>
+#include <boost/mpl/transform.hpp>
+#include <boost/mpl/inherit.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include <pcl/io/boost.h>
 #include <pcl/io/ply/ply.h>
 #include <pcl/io/ply/io_operators.h>

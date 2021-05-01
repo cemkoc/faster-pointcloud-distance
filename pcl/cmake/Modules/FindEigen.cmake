@@ -16,6 +16,7 @@ find_path(EIGEN_INCLUDE_DIR Eigen/Core
     PATHS "$ENV{PROGRAMFILES}/Eigen" "$ENV{PROGRAMW6432}/Eigen"
           "$ENV{PROGRAMFILES}/Eigen3" "$ENV{PROGRAMW6432}/Eigen3"
           "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/eigen-3.3.8"
+          "$ENV{HOME}/spack/opt/spack/cray-cnl7-haswell/gcc-8.3.0/eigen-3.3.9"
     PATH_SUFFIXES eigen3 include/eigen3 include)
 
 if(EIGEN_INCLUDE_DIR)
