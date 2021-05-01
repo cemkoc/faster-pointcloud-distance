@@ -2,6 +2,7 @@
 // Created by Cem Koc on 4/9/21.
 //
 
+#include <pcl/cloud_distance/distance.cuh>
 #include <pcl/cloud_distance/distance.h>
 #include <pcl/cloud_distance/io.h>
 
@@ -19,7 +20,7 @@ main(int argc, char* argv[])
   *cloud_a_ptr = distance::io::read_pointcloud(std::string(argv[1]));
   *cloud_b_ptr = distance::io::read_pointcloud(std::string(argv[2]));
 
-  distance::Distance dist;
+  distance::DistanceCuda dist;
   double distance;
 
   auto start = std::chrono::high_resolution_clock::now();
@@ -31,7 +32,7 @@ main(int argc, char* argv[])
   // std::cout << "[All-pairs] Chamfer distance between: " << distance << std::endl;
 
   // localized Chamfer
-  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr, 1);
+  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr);
 
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "[Localized] Chamfer distance between: " << distance << std::endl;

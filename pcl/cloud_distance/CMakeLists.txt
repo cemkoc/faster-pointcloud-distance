@@ -44,12 +44,3 @@ target_link_libraries(pcl_cloud_distance_read_point_cloud
   pcl_cloud_distance
 )
 target_compile_definitions(pcl_cloud_distance_read_point_cloud PUBLIC -DBOOST_NO_CXX11_SCOPED_ENUMS)
-
-
-PCL_ADD_EXECUTABLE(pcl_cloud_distance_compute_distance_cuda COMPONENT "${SUBSYS_NAME}_utils" SOURCES utils/compute_distance_cuda.cu)
-target_link_libraries(pcl_cloud_distance_compute_distance_cuda
-  pcl_cloud_distance
-)
-
-target_compile_definitions(pcl_cloud_distance_compute_distance_cuda PUBLIC -DBOOST_NO_CXX11_SCOPED_ENUMS)
-set_target_properties(pcl_cloud_distance_compute_distance_cuda PROPERTIES LINKER_LANGUAGE CXX)

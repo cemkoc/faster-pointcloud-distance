@@ -1,8 +1,8 @@
 #include <cmath>
 #include <vector>
 #include <numeric>
-#include <pcl/gpu/containers/device_array.h>
-#include <pcl/gpu/octree/octree.hpp>
+//#include <pcl/gpu/containers/device_array.h>
+//#include <pcl/gpu/octree/octree.hpp>
 #include <thrust/device_vector.h>
 #include <thrust/reduce.h>
 
@@ -28,9 +28,6 @@ __global__ void compute_kernel(pcl::PointXYZ* cloud_a_ptr, pcl::PointXYZ* cloud_
             min_sofar = dist;
         }
     }
-    if (point_id % 10000 == 0) {
-        printf("reached after\n");
-    }
     mins[point_id] = min_sofar;
 }
 
@@ -41,31 +38,34 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
     pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
     pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
 
+    // in order to upload, we need to essentially unalign the vector rip
+    pcl::PointXYZ* local_a_ptr = new pcl::PointXYZ[cloud_a.size()];
+    pcl::PointXYZ* local_b_ptr = new pcl::PointXYZ[cloud_b.size()];
+    for (int i = 0; i < cloud_a.size(); ++i) {
+        local_a_ptr[i] = cloud_a.points[i];
+    }
+    for (int i = 0; i < cloud_b.size(); ++i) {
+        local_b_ptr[i] = cloud_b.points[i];
+    }
+
     pcl::PointXYZ* cuda_a_ptr;
     pcl::PointXYZ* cuda_b_ptr;
     double* mins;
-    cudaMalloc((void**)&mins, max(cloud_a.points.size(), cloud_b.points.size()) * sizeof(double));
-    cudaMalloc((void**)&cuda_a_ptr, cloud_a.points.size() * sizeof(pcl::PointXYZ));
-    cudaMalloc((void**)&cuda_b_ptr, cloud_b.points.size() * sizeof(pcl::PointXYZ));
-    std::cout << "blah" << std::endl;
-    cudaMemcpy(cuda_a_ptr, &(cloud_a.points), cloud_a.points.size() * sizeof(pcl::PointXYZ), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&mins, max(cloud_a.size(), cloud_b.size()) * sizeof(double));
+    cudaMalloc((void**)&cuda_a_ptr, cloud_a.size() * sizeof(pcl::PointXYZ));
+    cudaMalloc((void**)&cuda_b_ptr, cloud_b.size() * sizeof(pcl::PointXYZ));
 
-    std::cout << "a alloced" << std::endl;
-    cudaMemcpy(cuda_b_ptr, &(cloud_b.points), cloud_b.points.size() * sizeof(pcl::PointXYZ), cudaMemcpyHostToDevice);
-    std::cout << "finished allocs" << std::endl;
+    cudaMemcpy(cuda_a_ptr, local_a_ptr, cloud_a.size() * sizeof(pcl::PointXYZ), cudaMemcpyHostToDevice);
+    cudaMemcpy(cuda_b_ptr, local_b_ptr, cloud_b.size() * sizeof(pcl::PointXYZ), cudaMemcpyHostToDevice);
 
-    int blks = (cloud_a.points.size() + NUM_THREADS - 1) / NUM_THREADS;
-    compute_kernel<<<blks, NUM_THREADS>>>(cuda_a_ptr, cuda_b_ptr, cloud_a.points.size(), cloud_b.points.size(), mins);
-    cudaDeviceSynchronize();
-    std::cout << "first calc done" << std::endl;
-    double sum_a = thrust::reduce(thrust::device, mins, mins + cloud_a.points.size(), 0.0);  // TODO THIS NEED TO BE DEVICE
+    int blks = (cloud_a.size() + NUM_THREADS - 1) / NUM_THREADS;
+    compute_kernel<<<blks, NUM_THREADS>>>(cuda_a_ptr, cuda_b_ptr, cloud_a.size(), cloud_b.size(), mins);
 
-    std::cout << "first red done" << std::endl;
+    double sum_a = thrust::reduce(thrust::device, mins, mins + cloud_a.size(), 0.0);  // TODO THIS NEED TO BE DEVICE
 
-    blks = (cloud_b.points.size() + NUM_THREADS - 1) / NUM_THREADS;
-    compute_kernel<<<blks, NUM_THREADS>>>(cuda_b_ptr, cuda_a_ptr, cloud_b.points.size(), cloud_a.points.size(), mins);
-    std::cout << "second calc done" << std::endl;
-    double sum_b = thrust::reduce(thrust::device, mins, mins + cloud_b.points.size(), 0.0);
+    blks = (cloud_b.size() + NUM_THREADS - 1) / NUM_THREADS;
+    compute_kernel<<<blks, NUM_THREADS>>>(cuda_b_ptr, cuda_a_ptr, cloud_b.size(), cloud_a.size(), mins);
+    double sum_b = thrust::reduce(thrust::device, mins, mins + cloud_b.size(), 0.0);
 
     return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
 }
@@ -77,7 +77,7 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
 //     pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
 //     pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
     
-//     thrust::device_vector<float> mins(max(cloud_a.points.size(), cloud_b.points.size()));
+//     thrust::device_vector<float> mins(max(cloud_a.size(), cloud_b.size()));
 //     // can we reuse this for iteration? or do we need to upload 
 //     // the points separately
 //     pcl::gpu::Octree::PointCloud cloud_a_device;
@@ -117,13 +117,13 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
 
 //     /* or should we do this method/ is it possible?
 //     compute_kernel(cloud_a_device, octree_device, mins);
-//     double sum_a = thrust::reduce(mins.begin(), mins.begin() + cloud_a.points.size(), thrust::plus<float>());
+//     double sum_a = thrust::reduce(mins.begin(), mins.begin() + cloud_a.size(), thrust::plus<float>());
 
 //     octree_device->setCloud(cloud_a_device);
 //     octree_device->build();
 
 //     compute_kernel(cloud_b_device, octree_device, mins);
-//     double sum_b = thrust::reduce(mins.begin(), mins.begin() + cloud_b.points.size(), thrust::plus<float>());
+//     double sum_b = thrust::reduce(mins.begin(), mins.begin() + cloud_b.size(), thrust::plus<float>());
 //     */
 //     return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
 // }
