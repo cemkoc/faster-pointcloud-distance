@@ -10,7 +10,7 @@
 #include <unordered_map>
 
 
-const bool VERBOSE = true;
+const bool VERBOSE = false;
 
 namespace distance {
 namespace omp {
@@ -40,7 +40,7 @@ double Distance::compute_distance_oct(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
 
   #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) 
   for (auto pt: cloud_a) {
-    int numres = octree_b.radiusSearch(pt, 0.01f, pointIdxRadSearch, pointRadSquaredDistance, 100);
+    int numres = octree_b.radiusSearch(pt, 0.1f, pointIdxRadSearch, pointRadSquaredDistance, 100);
     if (VERBOSE)
       mp[numres]++;
     if (!numres) {
@@ -91,7 +91,6 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
 
   pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
   pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
-  std::vector<float> to_sum(std::max(cloud_a.size(), cloud_b.size()));
 
   // Forward direction Chamfer
   #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(min_sofar)
@@ -105,9 +104,9 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
         min_sofar = dist;
       }
     }
-    to_sum[i] = min_sofar;
+    #pragma omp critical
+    sum_a += min_sofar;
   }
-  sum_a = std::accumulate(to_sum.begin(), to_sum.begin() + cloud_a.size(), 0);
 
 
   // Backward direction Chamfer
@@ -122,10 +121,9 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
         min_sofar = dist;
       }
     }
-    to_sum[i] = min_sofar;
+    #pragma omp critical
+    sum_b += min_sofar;
   }
-
-  sum_b = std::accumulate(to_sum.begin(), to_sum.begin() + cloud_b.size(), 0);
 
   return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
 }
