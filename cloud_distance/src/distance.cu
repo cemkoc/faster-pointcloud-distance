@@ -12,7 +12,7 @@
 
 #define NUM_THREADS 512
 
-__global__ void compute_kernel(pcl::PointXYZ* cloud_a_ptr, pcl::PointXYZ* cloud_b_ptr,
+__global__ void naive_compute_kernel(pcl::PointXYZ* cloud_a_ptr, pcl::PointXYZ* cloud_b_ptr,
     int asize, int bsize, double* mins) {
     int point_id = threadIdx.x + blockIdx.x * blockDim.x;
     if (point_id >= asize) {
@@ -24,6 +24,29 @@ __global__ void compute_kernel(pcl::PointXYZ* cloud_a_ptr, pcl::PointXYZ* cloud_
     for (int i = 0; i < bsize; ++i) {
         pcl::PointXYZ point_b = cloud_b_ptr[i];
         double dist = pow(point_a.x - point_b.x, 2.0) + pow(point_a.y - point_b.y, 2.0) + pow(point_a.z - point_b.z, 2.0);
+        if (dist < min_sofar) {
+            min_sofar = dist;
+        }
+    }
+    mins[point_id] = min_sofar;
+}
+
+__global__ void radius_compute_kernel(int size, int max_res, int* octree_indices, int* res_sizes,
+                                      pcl::PointXYZ* octree_points, pcl::PointXYZ* search_points, double* mins) {
+    int point_id = threadIdx.x + blockIdx.x * blockDim.x;
+    if (point_id >= size) {
+        return;
+    }
+    if (!res_sizes[point_id]) {
+        mins[point_id] = 0.0;
+        return;
+    }
+
+    pcl::PointXYZ point_source = search_points[point_id];
+    double min_sofar = std::numeric_limits<double>::max();
+    for (int i = 0; i < res_sizes[point_id]; ++i) {
+        pcl::PointXYZ radius_point = octree_points[octree_indices[point_id * max_res + i]];
+        double dist = pow(point_source.x - radius_point.x, 2.0) + pow(point_source.y - radius_point.y, 2.0) + pow(point_source.z - radius_point.z, 2.0);
         if (dist < min_sofar) {
             min_sofar = dist;
         }
@@ -59,12 +82,12 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
     cudaMemcpy(cuda_b_ptr, local_b_ptr, cloud_b.size() * sizeof(pcl::PointXYZ), cudaMemcpyHostToDevice);
 
     int blks = (cloud_a.size() + NUM_THREADS - 1) / NUM_THREADS;
-    compute_kernel<<<blks, NUM_THREADS>>>(cuda_a_ptr, cuda_b_ptr, cloud_a.size(), cloud_b.size(), mins);
+    naive_compute_kernel<<<blks, NUM_THREADS>>>(cuda_a_ptr, cuda_b_ptr, cloud_a.size(), cloud_b.size(), mins);
 
     double sum_a = thrust::reduce(thrust::device, mins, mins + cloud_a.size(), 0.0);  // TODO THIS NEED TO BE DEVICE
 
     blks = (cloud_b.size() + NUM_THREADS - 1) / NUM_THREADS;
-    compute_kernel<<<blks, NUM_THREADS>>>(cuda_b_ptr, cuda_a_ptr, cloud_b.size(), cloud_a.size(), mins);
+    naive_compute_kernel<<<blks, NUM_THREADS>>>(cuda_b_ptr, cuda_a_ptr, cloud_b.size(), cloud_a.size(), mins);
     double sum_b = thrust::reduce(thrust::device, mins, mins + cloud_b.size(), 0.0);
 
     return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
@@ -84,42 +107,20 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
     cloud_a_device.upload(cloud_a.points);
     cloud_b_device.upload(cloud_b.points);
 
-    pcl::gpu::Octree::Queries queries_a_device;
-    pcl::gpu::Octree::Queries queries_b_device;
-
-    // option 1
-    queries_a_device.upload(cloud_a.points);
-    queries_b_device.upload(cloud_b.points);
-    //
-    /* option 2
-    std::vector<pcl::PointXYZ> points;
-    points.resize(cloud_a.size());
-    for (int i = 0; i < cloud_a.size(); ++i) {
-        points[i] = cloud_a.points[i];
-    }
-    queries_a_device.upload(points);
-    points.resize(cloud_b.size());
-    for (int i = 0; i < cloud_b.size(); ++i) {
-        points[i] = cloud_b.points[i];
-    }
-    queries_b_device.upload(points);
-    */
-
-
-    // reuse the same octree for both a and b
     pcl::gpu::Octree::Ptr octree_device (new pcl::gpu::Octree);
-    octree_device->setCloud(cloud_b_device);
-    octree_device->build();
-
-    // can we reuse one of the _x_ind?
+    pcl::gpu::Octree::Queries queries_device;
     pcl::gpu::NeighborIndices _a_ind(cloud_a.size(), 1);
     pcl::gpu::NeighborIndices _b_ind(cloud_b.size(), 1);
     pcl::gpu::Octree::ResultSqrDists a_res;
     pcl::gpu::Octree::ResultSqrDists b_res;
 
-    // do the above need sizes???? TODO
+    queries_device.upload(cloud_a.points);
+    octree_device->setCloud(cloud_b_device);
+    octree_device->build();
 
-    octree_device->nearestKSearchBatch(queries_a_device, 1, _a_ind, a_res);
+    octree_device->nearestKSearchBatch(queries_device, 1, _a_ind, a_res);
+
+    queries_device.upload(cloud_b.points);
 
     // can we sum on device instead?
     std::vector<float> downloaded(cloud_a.size());
@@ -128,7 +129,7 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
 
     octree_device->setCloud(cloud_a_device);
     octree_device->build();
-    octree_device->nearestKSearchBatch(queries_b_device, 1, _b_ind, b_res);
+    octree_device->nearestKSearchBatch(queries_device, 1, _b_ind, b_res);
 
     // can we sum on device instead?
     downloaded.resize(cloud_b.size());
@@ -138,16 +139,17 @@ double DistanceCuda::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
     return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
 }
 
-/*
 double DistanceCuda::compute_distance_radius(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_a_ptr,
                                       pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr) {
 
-    printf("Running with K=%d\n", k);
+    float rad = 3;
+    int max_res = 1024;
+    printf("Running with Radius=%f\n", rad);
     pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
     pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
-    
-    thrust::device_vector<float> mins(max(cloud_a.size(), cloud_b.size()));
-    
+    double* mins;
+    cudaMalloc((void**)&mins, max(cloud_a.size(), cloud_b.size()) * sizeof(double));
+
     // can we reuse this for iteration? or do we need to upload 
     // the points separately
     pcl::gpu::Octree::PointCloud cloud_a_device;
@@ -155,56 +157,34 @@ double DistanceCuda::compute_distance_radius(pcl::PointCloud<pcl::PointXYZ>::Con
     cloud_a_device.upload(cloud_a.points);
     cloud_b_device.upload(cloud_b.points);
 
-    pcl::gpu::Octree::Queries queries_a_device;
-    pcl::gpu::Octree::Queries queries_b_device;
-
-    // option 1
-    queries_a_device.upload(cloud_a.points);
-    queries_b_device.upload(cloud_b.points);
-    //
-    /* option 2
-    std::vector<pcl::PointXYZ> points;
-    points.resize(cloud_a.size());
-    for (int i = 0; i < cloud_a.size(); ++i) {
-        points[i] = cloud_a.points[i];
-    }
-    queries_a_device.upload(points);
-    points.resize(cloud_b.size());
-    for (int i = 0; i < cloud_b.size(); ++i) {
-        points[i] = cloud_b.points[i];
-    }
-    queries_b_device.upload(points);
-    //
-
-
-    // reuse the same octree for both a and b
+    pcl::gpu::Octree::Queries queries_device;
     pcl::gpu::Octree::Ptr octree_device (new pcl::gpu::Octree);
+    pcl::gpu::NeighborIndices a_ind(cloud_a.size(), max_res);
+    pcl::gpu::NeighborIndices b_ind(cloud_b.size(), max_res);
+
+    queries_device.upload(cloud_a.points);
     octree_device->setCloud(cloud_b_device);
     octree_device->build();
 
-    // can we reuse one of the _x_ind?
-    pcl::gpu::NeighborIndices _a_ind(cloud_a.size(), 1);
-    pcl::gpu::NeighborIndices _b_ind(cloud_b.size(), 1);
+    octree_device->radiusSearch(queries_device, rad, max_res, a_ind);
+    int blks = (cloud_a.size() + NUM_THREADS - 1) / NUM_THREADS;
+    radius_compute_kernel<<<blks, NUM_THREADS>>>(cloud_a.size(), max_res, a_ind.data.ptr(), a_ind.sizes.ptr(),
+                                                 cloud_b_device.ptr(), cloud_a_device.ptr(), mins);
 
-    // do the above need sizes???? TODO
+    double sum_a = thrust::reduce(thrust::device, mins, mins + cloud_a.size(), 0.0);
 
-    octree_device.nearestKSearchBatch(queries_a_device, 1, _a_ind, a_res);
-
-    // can we sum on device instead?
-    std::vector<float> downloaded(cloud_a.size());
-    a_res.download(downloaded);
-    double sum_a = accumulate(downloaded.begin(), downloaded.end(), 0.0);
-
+    queries_device.upload(cloud_b.points);
     octree_device->setCloud(cloud_a_device);
     octree_device->build();
-    octree_device.nearestKSearchBatch(queries_b_device, 1, _b_ind, b_res);
 
-    // can we sum on device instead?
-    downloaded.resize(cloud_b.size());
-    b_res.download(downloaded);
-    double sum_b = accumulate(downloaded.begin(), downloaded.end(), 0.0);
+    octree_device->radiusSearch(queries_device, rad, max_res, b_ind);
+    blks = (cloud_b.size() + NUM_THREADS - 1) / NUM_THREADS;
+    radius_compute_kernel<<<blks, NUM_THREADS>>>(cloud_b.size(), max_res, b_ind.data.ptr(), b_ind.sizes.ptr(),
+                                                 cloud_a_device.ptr(), cloud_b_device.ptr(), mins);
+                                                 
+    double sum_b = thrust::reduce(thrust::device, mins, mins + cloud_b.size(), 0.0);
 
     return (1.0 / cloud_a.size()) * sum_a + (1.0 / cloud_b.size()) * sum_b;
 }
-*/
+
 }

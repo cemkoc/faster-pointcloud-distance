@@ -21,10 +21,13 @@ int main(int argc, char* argv[]) {
   distance::DistanceCuda dist;
   double distance;
 
+  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr);
+  std::cout << "reference distance " << distance << std::endl;
+
   auto start = std::chrono::high_resolution_clock::now();
 
   // all-pairs Chamfer distance
-  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr, 1);
+  distance = dist.compute_distance_radius(cloud_a_ptr, cloud_b_ptr);
 
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "[All-pairs] Chamfer distance between: " << distance << std::endl;
