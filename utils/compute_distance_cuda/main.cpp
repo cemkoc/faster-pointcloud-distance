@@ -5,12 +5,10 @@
 #include <chrono>
 #include <iostream>
 #include "cloud_distance/io.h"
-#include "cloud_distance/distance_omp.h"
+#include "cloud_distance/distance.cuh"
 
 int main(int argc, char* argv[]) {
 
-  // int total = distance::omp::test_omp_cem();
-  // std::cout << "Total after OMP Block " << total << std::endl;
 
   std::cout << "Reading two point clouds." << std::endl;
 
@@ -20,7 +18,7 @@ int main(int argc, char* argv[]) {
   *cloud_a_ptr = distance::io::read_pointcloud(std::string(argv[1]));
   *cloud_b_ptr = distance::io::read_pointcloud(std::string(argv[2]));
 
-  distance::omp::Distance dist;
+  distance::DistanceCuda dist;
   double distance;
 
   auto start = std::chrono::high_resolution_clock::now();
@@ -31,11 +29,6 @@ int main(int argc, char* argv[]) {
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "[All-pairs] Chamfer distance between: " << distance << std::endl;
 
-  // localized Chamfer
-//  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr, 1000);
-//
-//  auto end = std::chrono::high_resolution_clock::now();
-//  std::cout << "[Localized] Chamfer distance between: " << distance << std::endl;
 
   double time_diff = std::chrono::duration<double>(end - start).count();
   printf("Time: %lf seconds\n ", time_diff);
