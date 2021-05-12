@@ -10,6 +10,8 @@ target_include_directories(faster_cloud_distance PUBLIC
   $<INSTALL_INTERFACE:include>  # <prefix>/include/mylib
 )
 
+target_link_libraries(faster_cloud_distance ${CUDA_LIBRARIES})
+
 target_link_libraries(faster_cloud_distance
       PUBLIC
         pcl_io
