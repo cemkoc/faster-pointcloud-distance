@@ -21,19 +21,23 @@ int main(int argc, char* argv[]) {
   distance::DistanceCuda dist;
   double distance;
 
-  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr);
-  std::cout << "reference distance " << distance << std::endl;
+  // distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr);
+  // std::cout << "reference distance " << distance << std::endl;
 
   auto start = std::chrono::high_resolution_clock::now();
 
   // all-pairs Chamfer distance
-  distance = dist.compute_distance_radius(cloud_a_ptr, cloud_b_ptr);
+  int numtorun = 1;
+  for (int i = 0; i < numtorun; ++i) {
+    distance = dist.compute_distance_radius(cloud_a_ptr, cloud_b_ptr, 1);
+  }
+
 
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "[All-pairs] Chamfer distance between: " << distance << std::endl;
 
 
-  double time_diff = std::chrono::duration<double>(end - start).count();
+  double time_diff = std::chrono::duration<double>(end - start).count() / numtorun;
   printf("Time: %lf seconds\n ", time_diff);
 
   return 0;
