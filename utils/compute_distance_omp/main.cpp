@@ -22,14 +22,30 @@ int main(int argc, char* argv[]) {
 
   distance::omp::Distance dist;
   double distance;
+  int numruns = 5;
 
   auto start = std::chrono::high_resolution_clock::now();
-
-  // all-pairs Chamfer distance
-  distance = dist.compute_distance_oct(cloud_a_ptr, cloud_b_ptr);
-
+  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr);
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "[All-pairs] Chamfer distance between: " << distance << std::endl;
+  double time_diff = std::chrono::duration<double>(end - start).count();
+  printf("Time: %lf seconds\n ", time_diff);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < numruns; ++i)
+    distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr, 100);
+  end = std::chrono::high_resolution_clock::now();
+  std::cout << "[kd] Chamfer distance between: " << distance << std::endl;
+  time_diff = std::chrono::duration<double>(end - start).count();
+  printf("Time: %lf seconds\n ", time_diff / numruns);
+
+  start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < numruns; ++i)
+    distance = dist.compute_distance_oct(cloud_a_ptr, cloud_b_ptr);
+  end = std::chrono::high_resolution_clock::now();
+  std::cout << "[oct] Chamfer distance between: " << distance << std::endl;
+  time_diff = std::chrono::duration<double>(end - start).count();
+  printf("Time: %lf seconds\n ", time_diff / numruns);
 
   // localized Chamfer
 //  distance = dist.compute_distance(cloud_a_ptr, cloud_b_ptr, 1000);
@@ -37,8 +53,7 @@ int main(int argc, char* argv[]) {
 //  auto end = std::chrono::high_resolution_clock::now();
 //  std::cout << "[Localized] Chamfer distance between: " << distance << std::endl;
 
-  double time_diff = std::chrono::duration<double>(end - start).count();
-  printf("Time: %lf seconds\n ", time_diff);
+  
 
   return 0;
 }

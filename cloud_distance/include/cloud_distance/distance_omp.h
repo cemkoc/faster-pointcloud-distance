@@ -8,7 +8,7 @@
 
 #include <omp.h>
 
-#define NUM_THREADS 12
+#define NUM_THREADS 32
 
 namespace distance {
 namespace omp {

@@ -19,7 +19,6 @@ double Distance::compute_distance_oct(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
                                       pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_b_ptr) {
   double sum_a = 0.0;
   double sum_b = 0.0;
-  float minsofar;
 
   pcl::PointCloud<pcl::PointXYZ> cloud_a = *cloud_a_ptr;
   pcl::PointCloud<pcl::PointXYZ> cloud_b = *cloud_b_ptr;
@@ -38,7 +37,7 @@ double Distance::compute_distance_oct(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
   float approxdist;
   std::unordered_map<int, int> mp;
 
-  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) 
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(approxdist,pointIdxRadSearch,pointRadSquaredDistance)
   for (auto pt: cloud_a) {
     int numres = octree_b.radiusSearch(pt, 0.1f, pointIdxRadSearch, pointRadSquaredDistance, 100);
     if (VERBOSE)
@@ -53,9 +52,9 @@ double Distance::compute_distance_oct(pcl::PointCloud<pcl::PointXYZ>::ConstPtr c
     sum_a += approxdist;
   }
 
-  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) 
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(approxdist,pointIdxRadSearch,pointRadSquaredDistance)
   for (auto pt: cloud_b) {
-    int numres = octree_a.radiusSearch(pt, 0.01f, pointIdxRadSearch, pointRadSquaredDistance, 100);
+    int numres = octree_a.radiusSearch(pt, 0.1f, pointIdxRadSearch, pointRadSquaredDistance, 100);
     if (VERBOSE)
       mp[numres]++;
     if (!numres) {
@@ -169,8 +168,8 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   std::vector<float> pointKNNSquaredDistance(k); // holds the resultant squared distances to nearby points
 
   // forward direction
-  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(minsofar)
-  for (auto point_iter_a = cloud_a.begin(); point_iter_a != cloud_a.end(); ++point_iter_a) {
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(minsofar, pointIdxKNNSearch, pointKNNSquaredDistance)
+  for (auto point_iter_a = cloud_a.begin(); point_iter_a < cloud_a.end(); ++point_iter_a) {
     pcl::PointXYZ point_a = *point_iter_a;
 //    std::cout << "K-nearest neighbor search at (" << point_a.x
 //              << " " << point_a.y
@@ -195,7 +194,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
           minsofar = dist;
         }
       }
-
+      #pragma omp critical
       sum_a = sum_a + static_cast<double>(minsofar);
     }
   }
@@ -205,7 +204,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
   pointKNNSquaredDistance.clear();
 
   // backward direction
-  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(minsofar)
+  #pragma omp parallel for num_threads(NUM_THREADS) schedule(dynamic) private(minsofar, pointIdxKNNSearch, pointKNNSquaredDistance)
   for (auto point_iter_b = cloud_b.begin(); point_iter_b != cloud_b.end(); ++point_iter_b) {
     pcl::PointXYZ point_b = *point_iter_b;
 //    std::cout << "K-nearest neighbor search at (" << point_b.x
@@ -232,6 +231,7 @@ double Distance::compute_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud
         }
       }
 
+      #pragma omp critical
       sum_b = sum_b + static_cast<double>(minsofar);
     }
   }
